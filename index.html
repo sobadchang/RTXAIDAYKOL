@@ -1,249 +1,460 @@
- (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
-diff --git a/index.html b/index.html
-new file mode 100644
-index 0000000000000000000000000000000000000000..9dc06518795c811989584a2e2ff488eb08ef2855
---- /dev/null
-+++ b/index.html
-@@ -0,0 +1,239 @@
-+<!doctype html>
-+<html lang="zh-Hant">
-+<head>
-+  <meta charset="UTF-8">
-+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-+  <title>簡易抽籤</title>
-+  <style>
-+    body {
-+      font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
-+      background: #f5f7fb;
-+      color: #222;
-+      margin: 0;
-+      padding: 24px;
-+      display: flex;
-+      justify-content: center;
-+    }
-+
-+    .card {
-+      background: white;
-+      border-radius: 12px;
-+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
-+      padding: 24px 28px;
-+      max-width: 520px;
-+      width: 100%;
-+    }
-+
-+    h1 {
-+      margin-top: 0;
-+      font-size: 24px;
-+    }
-+
-+    .section {
-+      margin: 18px 0;
-+    }
-+
-+    label {
-+      display: block;
-+      margin-bottom: 8px;
-+      font-weight: 600;
-+    }
-+
-+    select, button {
-+      font-size: 16px;
-+      padding: 10px 12px;
-+      border-radius: 8px;
-+      border: 1px solid #cbd5e1;
-+    }
-+
-+    select {
-+      width: 100%;
-+      background: #fff;
-+    }
-+
-+    button {
-+      cursor: pointer;
-+      background: #2563eb;
-+      color: #fff;
-+      border: none;
-+      transition: transform 0.08s ease, box-shadow 0.1s ease, background 0.1s ease;
-+      margin-right: 10px;
-+    }
-+
-+    button:disabled {
-+      background: #cbd5e1;
-+      cursor: not-allowed;
-+      transform: none;
-+      box-shadow: none;
-+    }
-+
-+    button:hover:not(:disabled) {
-+      background: #1d4ed8;
-+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
-+      transform: translateY(-1px);
-+    }
-+
-+    .actions {
-+      display: flex;
-+      flex-wrap: wrap;
-+      gap: 10px;
-+      align-items: center;
-+    }
-+
-+    .status {
-+      margin-top: 12px;
-+      font-weight: 600;
-+    }
-+
-+    .assignments {
-+      margin-top: 12px;
-+      padding: 12px;
-+      background: #f8fafc;
-+      border-radius: 8px;
-+      border: 1px solid #e2e8f0;
-+    }
-+
-+    .assignment-row {
-+      display: flex;
-+      align-items: center;
-+      justify-content: space-between;
-+      padding: 6px 0;
-+      border-bottom: 1px dashed #e2e8f0;
-+    }
-+
-+    .assignment-row:last-child {
-+      border-bottom: none;
-+    }
-+
-+    .tag {
-+      display: inline-block;
-+      padding: 3px 8px;
-+      border-radius: 6px;
-+      background: #eef2ff;
-+      color: #4338ca;
-+      font-size: 13px;
-+    }
-+  </style>
-+</head>
-+<body>
-+  <div class="card">
-+    <h1>展場廠商抽籤</h1>
-+    <p>選擇廠商後點擊「抽籤」即可隨機綁定一位 KOL。每位廠商只會抽中一次，KOL 也不會重複被分配。</p>
-+
-+    <div class="section">
-+      <label for="vendorSelect">選擇廠商</label>
-+      <select id="vendorSelect">
-+        <option value="" selected>請選擇</option>
-+      </select>
-+    </div>
-+
-+    <div class="section">
-+      <label>可抽選的 KOL（固定時段）</label>
-+      <ul>
-+        <li>12:45-13:15 JoJo</li>
-+        <li>15:15-15:45 筠熹</li>
-+        <li>16:30-17:00 蘋蘋</li>
-+      </ul>
-+    </div>
-+
-+    <div class="section actions">
-+      <button id="drawButton">抽籤</button>
-+      <button id="resetButton" type="button" style="background:#64748b;">Clean</button>
-+      <span id="status" class="status"></span>
-+    </div>
-+
-+    <div class="assignments" id="assignments">
-+      <strong>分配結果</strong>
-+      <div id="assignmentList"></div>
-+    </div>
-+  </div>
-+
-+  <script>
-+    const vendors = ["ASUS", "MSI", "ZOTAC"];
-+    const kolPool = [
-+      { label: "12:45-13:15 JoJo", key: "JoJo" },
-+      { label: "15:15-15:45 筠熹", key: "筠熹" },
-+      { label: "16:30-17:00 蘋蘋", key: "蘋蘋" },
-+    ];
-+
-+    const vendorSelect = document.getElementById("vendorSelect");
-+    const drawButton = document.getElementById("drawButton");
-+    const resetButton = document.getElementById("resetButton");
-+    const statusEl = document.getElementById("status");
-+    const assignmentList = document.getElementById("assignmentList");
-+
-+    let assignments = {};
-+    let availableKols = [...kolPool];
-+
-+    function renderVendors() {
-+      vendorSelect.innerHTML = '<option value="">請選擇</option>';
-+      vendors.forEach((vendor) => {
-+        const option = document.createElement("option");
-+        option.value = vendor;
-+        option.textContent = vendor;
-+        option.disabled = Boolean(assignments[vendor]);
-+        vendorSelect.appendChild(option);
-+      });
-+    }
-+
-+    function renderAssignments() {
-+      assignmentList.innerHTML = "";
-+      if (Object.keys(assignments).length === 0) {
-+        assignmentList.textContent = "尚未抽籤";
-+        return;
-+      }
-+      Object.entries(assignments).forEach(([vendor, kol]) => {
-+        const row = document.createElement("div");
-+        row.className = "assignment-row";
-+        row.innerHTML = `<span>${vendor}</span><span class="tag">${kol.label}</span>`;
-+        assignmentList.appendChild(row);
-+      });
-+    }
-+
-+    function updateStatus(message, isError = false) {
-+      statusEl.textContent = message;
-+      statusEl.style.color = isError ? "#b91c1c" : "#15803d";
-+    }
-+
-+    function drawKol() {
-+      const vendor = vendorSelect.value;
-+      if (!vendor) {
-+        updateStatus("請先選擇廠商", true);
-+        return;
-+      }
-+      if (assignments[vendor]) {
-+        updateStatus(`${vendor} 已完成抽籤`, true);
-+        return;
-+      }
-+      if (availableKols.length === 0) {
-+        updateStatus("已無可用 KOL", true);
-+        return;
-+      }
-+
-+      const randomIndex = Math.floor(Math.random() * availableKols.length);
-+      const kol = availableKols.splice(randomIndex, 1)[0];
-+      assignments[vendor] = kol;
-+
-+      updateStatus(`${vendor} 抽中 ${kol.label}`);
-+      renderVendors();
-+      renderAssignments();
-+    }
-+
-+    function resetAll() {
-+      assignments = {};
-+      availableKols = [...kolPool];
-+      renderVendors();
-+      renderAssignments();
-+      statusEl.textContent = "已重置，可重新抽籤";
-+      statusEl.style.color = "#0f172a";
-+      vendorSelect.value = "";
-+    }
-+
-+    drawButton.addEventListener("click", drawKol);
-+    resetButton.addEventListener("click", resetAll);
-+
-+    renderVendors();
-+    renderAssignments();
-+  </script>
-+</body>
-+</html>
- 
-EOF
-)
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>廠商 x KOL 抽籤工具</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #1d4ed8 0, #020617 45%, #000 100%);
+      color: #e5e7eb;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .app {
+      background: rgba(15, 23, 42, 0.95);
+      border-radius: 24px;
+      padding: 28px 28px 24px;
+      max-width: 720px;
+      width: 100%;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.4);
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: #22c55e22;
+      border: 1px solid #22c55e;
+      color: #bbf7d0;
+      margin-bottom: 12px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 24px;
+    }
+
+    .subtitle {
+      margin: 0 0 18px;
+      font-size: 14px;
+      color: #9ca3af;
+    }
+
+    .section-title {
+      font-size: 15px;
+      margin: 18px 0 8px;
+      font-weight: 600;
+      color: #e5e7eb;
+    }
+
+    .vendor-list {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .vendor-btn {
+      flex: 1 1 0;
+      min-width: 90px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid #4b5563;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 14px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.15s ease;
+    }
+
+    .vendor-btn:hover:not(.locked):not(.active) {
+      background: #111827;
+      border-color: #60a5fa;
+    }
+
+    .vendor-btn.active {
+      border-color: #38bdf8;
+      background: linear-gradient(135deg, #0f172a, #082f49);
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.3);
+    }
+
+    .vendor-btn.locked {
+      border-color: #22c55e;
+      background: linear-gradient(135deg, #022c22, #064e3b);
+      color: #bbf7d0;
+      cursor: default;
+      opacity: 0.9;
+    }
+
+    .current-vendor {
+      font-size: 14px;
+      margin-top: 8px;
+      color: #e5e7eb;
+    }
+
+    .current-vendor span {
+      color: #38bdf8;
+      font-weight: 600;
+    }
+
+    .actions {
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    #drawButton {
+      padding: 10px 18px;
+      border-radius: 999px;
+      border: none;
+      background: linear-gradient(135deg, #0ea5e9, #22c55e);
+      color: #020617;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 10px 25px rgba(34, 197, 94, 0.35);
+      transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.15s ease;
+    }
+
+    #drawButton:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 30px rgba(34, 197, 94, 0.45);
+    }
+
+    #drawButton:disabled {
+      opacity: 0.4;
+      cursor: default;
+      box-shadow: none;
+    }
+
+    .message {
+      font-size: 13px;
+      color: #e5e7eb;
+      min-height: 18px;
+    }
+
+    .message strong {
+      color: #facc15;
+    }
+
+    .message-success {
+      color: #4ade80;
+    }
+
+    .message-error {
+      color: #f97373;
+    }
+
+    .results {
+      margin-top: 18px;
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(55, 65, 81, 0.9);
+      padding: 12px 14px 10px;
+    }
+
+    .results-title {
+      font-size: 14px;
+      margin: 0 0 8px;
+      color: #9ca3af;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 6px 4px;
+      text-align: left;
+    }
+
+    th {
+      font-weight: 600;
+      border-bottom: 1px solid #4b5563;
+      color: #e5e7eb;
+    }
+
+    tr:nth-child(odd) td {
+      background: rgba(15, 23, 42, 0.6);
+    }
+
+    tr:nth-child(even) td {
+      background: rgba(15, 23, 42, 0.3);
+    }
+
+    .kol-empty {
+      color: #6b7280;
+      font-style: italic;
+    }
+
+    .kol-name {
+      font-weight: 600;
+      color: #bfdbfe;
+    }
+
+    .kol-time {
+      color: #a5b4fc;
+      font-size: 12px;
+    }
+
+    .footer-note {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #6b7280;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid #6366f1;
+      font-size: 11px;
+      color: #c7d2fe;
+      margin-left: 4px;
+    }
+
+    @media (max-width: 600px) {
+      .app {
+        padding: 20px 16px 16px;
+      }
+
+      h1 {
+        font-size: 20px;
+      }
+
+      .vendor-btn {
+        font-size: 13px;
+        padding: 8px 10px;
+      }
+
+      #drawButton {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
+      }
+
+      .actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="tag">抽籤小工具 ✨</div>
+    <h1>廠商 x KOL 隨機配對</h1>
+    <p class="subtitle">
+      流程：先選廠商 → 按下「開始抽籤」→ 系統會從剩餘的 KOL 裡隨機抽一位並鎖定，不會重複。
+    </p>
+
+    <!-- Step 1: 選擇廠商 -->
+    <div>
+      <div class="section-title">1. 請先選擇廠商</div>
+      <div class="vendor-list">
+        <button class="vendor-btn" data-vendor="ASUS">ASUS</button>
+        <button class="vendor-btn" data-vendor="MSI">MSI</button>
+        <button class="vendor-btn" data-vendor="ZOTAC">ZOTAC</button>
+      </div>
+      <div class="current-vendor" id="currentVendorText">
+        尚未選擇廠商
+      </div>
+    </div>
+
+    <!-- Step 2: 抽籤 -->
+    <div class="actions">
+      <button id="drawButton">開始抽籤</button>
+      <div id="message" class="message"></div>
+    </div>
+
+    <!-- Step 3: 抽籤結果 -->
+    <div class="results">
+      <p class="results-title">
+        3. 抽籤結果
+        <span class="badge">每位 KOL 只會被抽到一次</span>
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th style="width: 25%;">廠商</th>
+            <th style="width: 50%;">KOL</th>
+            <th style="width: 25%;">時段</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>ASUS</td>
+            <td id="kol-ASUS" class="kol-empty">尚未抽籤</td>
+            <td id="time-ASUS" class="kol-empty">—</td>
+          </tr>
+          <tr>
+            <td>MSI</td>
+            <td id="kol-MSI" class="kol-empty">尚未抽籤</td>
+            <td id="time-MSI" class="kol-empty">—</td>
+          </tr>
+          <tr>
+            <td>ZOTAC</td>
+            <td id="kol-ZOTAC" class="kol-empty">尚未抽籤</td>
+            <td id="time-ZOTAC" class="kol-empty">—</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="footer-note">
+        KOL 名單：A. 12:45–13:15 JoJo ／ B. 15:15–15:45 筠熹 ／ C. 16:30–17:00 蘋蘋
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 廠商清單
+    const vendors = ["ASUS", "MSI", "ZOTAC"];
+
+    // KOL 清單（會被隨機分配，每位只會用一次）
+    const kolPool = [
+      { id: "A", name: "JoJo", time: "12:45–13:15" },
+      { id: "B", name: "筠熹", time: "15:15–15:45" },
+      { id: "C", name: "蘋蘋", time: "16:30–17:00" }
+    ];
+
+    let remainingKOLs = [...kolPool]; // 還沒被抽走的 KOL
+    const assignments = {};           // 廠商 -> KOL 配對結果
+    let currentVendor = null;         // 目前選中的廠商
+
+    const vendorButtons = document.querySelectorAll(".vendor-btn");
+    const drawButton = document.getElementById("drawButton");
+    const messageEl = document.getElementById("message");
+    const currentVendorText = document.getElementById("currentVendorText");
+
+    // 更新訊息顯示
+    function setMessage(text, type = "") {
+      messageEl.textContent = text;
+      messageEl.classList.remove("message-success", "message-error");
+      if (type === "success") {
+        messageEl.classList.add("message-success");
+      } else if (type === "error") {
+        messageEl.classList.add("message-error");
+      }
+    }
+
+    // 更新目前選擇廠商文字
+    function updateCurrentVendorText() {
+      if (!currentVendor) {
+        currentVendorText.textContent = "尚未選擇廠商";
+      } else {
+        currentVendorText.innerHTML = `目前選擇的廠商：<span>${currentVendor}</span>`;
+      }
+    }
+
+    // 點選廠商按鈕
+    vendorButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const vendor = btn.dataset.vendor;
+
+        // 如果這個廠商已經抽過 KOL，就不允許重新抽
+        if (assignments[vendor]) {
+          const assigned = assignments[vendor];
+          setMessage(
+            `${vendor} 已經抽到 KOL：${assigned.name}（${assigned.time}），無法重新抽籤。`,
+            "error"
+          );
+          return;
+        }
+
+        currentVendor = vendor;
+
+        // UI 上高亮現在選中的廠商
+        vendorButtons.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+
+        updateCurrentVendorText();
+        setMessage(`已選擇 ${vendor}，請按「開始抽籤」。`);
+      });
+    });
+
+    // 抽籤邏輯
+    drawButton.addEventListener("click", () => {
+      // 1. 確認有選廠商
+      if (!currentVendor) {
+        setMessage("請先選擇一個廠商再按抽籤。", "error");
+        return;
+      }
+
+      // 2. 檢查這個廠商是否已經抽過
+      if (assignments[currentVendor]) {
+        const assigned = assignments[currentVendor];
+        setMessage(
+          `${currentVendor} 已經抽到 KOL：${assigned.name}（${assigned.time}），無法重新抽籤。`,
+          "error"
+        );
+        return;
+      }
+
+      // 3. 檢查是否還有剩餘 KOL
+      if (remainingKOLs.length === 0) {
+        setMessage("所有 KOL 都已被分配完畢。", "error");
+        return;
+      }
+
+      // 4. 隨機從 remainingKOLs 抽一位
+      const randomIndex = Math.floor(Math.random() * remainingKOLs.length);
+      const kol = remainingKOLs.splice(randomIndex, 1)[0]; // 從 pool 移除
+
+      // 5. 記錄配對結果
+      assignments[currentVendor] = kol;
+
+      // 6. 更新結果表格
+      const kolCell = document.getElementById(`kol-${currentVendor}`);
+      const timeCell = document.getElementById(`time-${currentVendor}`);
+
+      kolCell.classList.remove("kol-empty");
+      timeCell.classList.remove("kol-empty");
+
+      kolCell.innerHTML = `<span class="kol-name">${kol.name}</span>`;
+      timeCell.innerHTML = `<span class="kol-time">${kol.time}</span>`;
+
+      // 7. 將該廠商按鈕標記為已鎖定
+      const btn = Array.from(vendorButtons).find(
+        (b) => b.dataset.vendor === currentVendor
+      );
+      if (btn) {
+        btn.classList.remove("active");
+        btn.classList.add("locked");
+        btn.disabled = true;
+      }
+
+      setMessage(
+        `${currentVendor} 抽到的 KOL 是：${kol.name}（${kol.time}）🎉`,
+        "success"
+      );
+
+      // 8. 如果 KOL 全部抽完，關閉抽籤按鈕
+      if (remainingKOLs.length === 0) {
+        drawButton.disabled = true;
+        setMessage("抽籤完成！所有廠商都已綁定 KOL ✅", "success");
+        currentVendor = null;
+        updateCurrentVendorText();
+      }
+    });
+
+    // 一開始先清空訊息
+    setMessage("");
+    updateCurrentVendorText();
+  </script>
+</body>
+</html>
