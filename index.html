@@ -141,6 +141,23 @@
       box-shadow: none;
     }
 
+    /* 新增：重置按鈕樣式 */
+    #resetButton {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid #6b7280;
+      background: transparent;
+      color: #e5e7eb;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    #resetButton:hover {
+      background: #111827;
+      border-color: #9ca3af;
+    }
+
     .message {
       font-size: 13px;
       color: #e5e7eb;
@@ -253,6 +270,10 @@
         flex-direction: column;
         align-items: stretch;
       }
+
+      #resetButton {
+        width: 100%;
+      }
     }
   </style>
 </head>
@@ -269,7 +290,6 @@
       <div class="section-title">1. 請先選擇廠商</div>
       <div class="vendor-list">
         <button class="vendor-btn" data-vendor="ASUS">ASUS</button>
-        <button class="vendor-btn" data-vendor="MSI">MSI</button>
         <button class="vendor-btn" data-vendor="ZOTAC">ZOTAC</button>
       </div>
       <div class="current-vendor" id="currentVendorText">
@@ -280,6 +300,8 @@
     <!-- Step 2: 抽籤 -->
     <div class="actions">
       <button id="drawButton">開始抽籤</button>
+      <!-- 新增：重置按鈕 -->
+      <button id="resetButton" type="button">重新全部重置</button>
       <div id="message" class="message"></div>
     </div>
 
@@ -329,7 +351,6 @@
     const kolPool = [
       { id: "A", name: "JoJo", time: "12:45–13:15" },
       { id: "B", name: "筠熹", time: "15:15–15:45" },
-      { id: "C", name: "蘋蘋", time: "16:30–17:00" }
     ];
 
     let remainingKOLs = [...kolPool]; // 還沒被抽走的 KOL
@@ -338,6 +359,7 @@
 
     const vendorButtons = document.querySelectorAll(".vendor-btn");
     const drawButton = document.getElementById("drawButton");
+    const resetButton = document.getElementById("resetButton"); // 新增：重置按鈕
     const messageEl = document.getElementById("message");
     const currentVendorText = document.getElementById("currentVendorText");
 
@@ -451,6 +473,41 @@
         updateCurrentVendorText();
       }
     });
+
+    // 重置功能：恢復到一開始的狀態
+    function resetApp() {
+      // 清空資料狀態
+      remainingKOLs = [...kolPool];
+      for (const key in assignments) {
+        delete assignments[key];
+      }
+      currentVendor = null;
+
+      // 恢復廠商按鈕
+      vendorButtons.forEach((btn) => {
+        btn.classList.remove("active", "locked");
+        btn.disabled = false;
+      });
+
+      // 恢復結果表格
+      vendors.forEach((v) => {
+        const kolCell = document.getElementById(`kol-${v}`);
+        const timeCell = document.getElementById(`time-${v}`);
+
+        kolCell.textContent = "尚未抽籤";
+        kolCell.classList.add("kol-empty");
+        timeCell.textContent = "—";
+        timeCell.classList.add("kol-empty");
+      });
+
+      // 恢復抽籤按鈕與顯示文字
+      drawButton.disabled = false;
+      updateCurrentVendorText();
+      setMessage("已重置，請重新選擇廠商並開始抽籤。");
+    }
+
+    // 點擊重置按鈕
+    resetButton.addEventListener("click", resetApp);
 
     // 一開始先清空訊息
     setMessage("");
