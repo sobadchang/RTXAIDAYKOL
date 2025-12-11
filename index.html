@@ -1,0 +1,249 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
+diff --git a/index.html b/index.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..9dc06518795c811989584a2e2ff488eb08ef2855
+--- /dev/null
++++ b/index.html
+@@ -0,0 +1,239 @@
++<!doctype html>
++<html lang="zh-Hant">
++<head>
++  <meta charset="UTF-8">
++  <meta name="viewport" content="width=device-width, initial-scale=1.0">
++  <title>簡易抽籤</title>
++  <style>
++    body {
++      font-family: "Noto Sans TC", "Microsoft JhengHei", sans-serif;
++      background: #f5f7fb;
++      color: #222;
++      margin: 0;
++      padding: 24px;
++      display: flex;
++      justify-content: center;
++    }
++
++    .card {
++      background: white;
++      border-radius: 12px;
++      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
++      padding: 24px 28px;
++      max-width: 520px;
++      width: 100%;
++    }
++
++    h1 {
++      margin-top: 0;
++      font-size: 24px;
++    }
++
++    .section {
++      margin: 18px 0;
++    }
++
++    label {
++      display: block;
++      margin-bottom: 8px;
++      font-weight: 600;
++    }
++
++    select, button {
++      font-size: 16px;
++      padding: 10px 12px;
++      border-radius: 8px;
++      border: 1px solid #cbd5e1;
++    }
++
++    select {
++      width: 100%;
++      background: #fff;
++    }
++
++    button {
++      cursor: pointer;
++      background: #2563eb;
++      color: #fff;
++      border: none;
++      transition: transform 0.08s ease, box-shadow 0.1s ease, background 0.1s ease;
++      margin-right: 10px;
++    }
++
++    button:disabled {
++      background: #cbd5e1;
++      cursor: not-allowed;
++      transform: none;
++      box-shadow: none;
++    }
++
++    button:hover:not(:disabled) {
++      background: #1d4ed8;
++      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
++      transform: translateY(-1px);
++    }
++
++    .actions {
++      display: flex;
++      flex-wrap: wrap;
++      gap: 10px;
++      align-items: center;
++    }
++
++    .status {
++      margin-top: 12px;
++      font-weight: 600;
++    }
++
++    .assignments {
++      margin-top: 12px;
++      padding: 12px;
++      background: #f8fafc;
++      border-radius: 8px;
++      border: 1px solid #e2e8f0;
++    }
++
++    .assignment-row {
++      display: flex;
++      align-items: center;
++      justify-content: space-between;
++      padding: 6px 0;
++      border-bottom: 1px dashed #e2e8f0;
++    }
++
++    .assignment-row:last-child {
++      border-bottom: none;
++    }
++
++    .tag {
++      display: inline-block;
++      padding: 3px 8px;
++      border-radius: 6px;
++      background: #eef2ff;
++      color: #4338ca;
++      font-size: 13px;
++    }
++  </style>
++</head>
++<body>
++  <div class="card">
++    <h1>展場廠商抽籤</h1>
++    <p>選擇廠商後點擊「抽籤」即可隨機綁定一位 KOL。每位廠商只會抽中一次，KOL 也不會重複被分配。</p>
++
++    <div class="section">
++      <label for="vendorSelect">選擇廠商</label>
++      <select id="vendorSelect">
++        <option value="" selected>請選擇</option>
++      </select>
++    </div>
++
++    <div class="section">
++      <label>可抽選的 KOL（固定時段）</label>
++      <ul>
++        <li>12:45-13:15 JoJo</li>
++        <li>15:15-15:45 筠熹</li>
++        <li>16:30-17:00 蘋蘋</li>
++      </ul>
++    </div>
++
++    <div class="section actions">
++      <button id="drawButton">抽籤</button>
++      <button id="resetButton" type="button" style="background:#64748b;">Clean</button>
++      <span id="status" class="status"></span>
++    </div>
++
++    <div class="assignments" id="assignments">
++      <strong>分配結果</strong>
++      <div id="assignmentList"></div>
++    </div>
++  </div>
++
++  <script>
++    const vendors = ["ASUS", "MSI", "ZOTAC"];
++    const kolPool = [
++      { label: "12:45-13:15 JoJo", key: "JoJo" },
++      { label: "15:15-15:45 筠熹", key: "筠熹" },
++      { label: "16:30-17:00 蘋蘋", key: "蘋蘋" },
++    ];
++
++    const vendorSelect = document.getElementById("vendorSelect");
++    const drawButton = document.getElementById("drawButton");
++    const resetButton = document.getElementById("resetButton");
++    const statusEl = document.getElementById("status");
++    const assignmentList = document.getElementById("assignmentList");
++
++    let assignments = {};
++    let availableKols = [...kolPool];
++
++    function renderVendors() {
++      vendorSelect.innerHTML = '<option value="">請選擇</option>';
++      vendors.forEach((vendor) => {
++        const option = document.createElement("option");
++        option.value = vendor;
++        option.textContent = vendor;
++        option.disabled = Boolean(assignments[vendor]);
++        vendorSelect.appendChild(option);
++      });
++    }
++
++    function renderAssignments() {
++      assignmentList.innerHTML = "";
++      if (Object.keys(assignments).length === 0) {
++        assignmentList.textContent = "尚未抽籤";
++        return;
++      }
++      Object.entries(assignments).forEach(([vendor, kol]) => {
++        const row = document.createElement("div");
++        row.className = "assignment-row";
++        row.innerHTML = `<span>${vendor}</span><span class="tag">${kol.label}</span>`;
++        assignmentList.appendChild(row);
++      });
++    }
++
++    function updateStatus(message, isError = false) {
++      statusEl.textContent = message;
++      statusEl.style.color = isError ? "#b91c1c" : "#15803d";
++    }
++
++    function drawKol() {
++      const vendor = vendorSelect.value;
++      if (!vendor) {
++        updateStatus("請先選擇廠商", true);
++        return;
++      }
++      if (assignments[vendor]) {
++        updateStatus(`${vendor} 已完成抽籤`, true);
++        return;
++      }
++      if (availableKols.length === 0) {
++        updateStatus("已無可用 KOL", true);
++        return;
++      }
++
++      const randomIndex = Math.floor(Math.random() * availableKols.length);
++      const kol = availableKols.splice(randomIndex, 1)[0];
++      assignments[vendor] = kol;
++
++      updateStatus(`${vendor} 抽中 ${kol.label}`);
++      renderVendors();
++      renderAssignments();
++    }
++
++    function resetAll() {
++      assignments = {};
++      availableKols = [...kolPool];
++      renderVendors();
++      renderAssignments();
++      statusEl.textContent = "已重置，可重新抽籤";
++      statusEl.style.color = "#0f172a";
++      vendorSelect.value = "";
++    }
++
++    drawButton.addEventListener("click", drawKol);
++    resetButton.addEventListener("click", resetAll);
++
++    renderVendors();
++    renderAssignments();
++  </script>
++</body>
++</html>
+ 
+EOF
+)
